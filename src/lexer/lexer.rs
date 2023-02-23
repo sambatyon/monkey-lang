@@ -16,14 +16,17 @@ impl<T: std::io::Read>  Lexer<T> {
       input: source,
       pos: 0,
       read_pos: 0,
-      ch: b'\0',
+      ch: b' ',
     };
     l.read_char()?;
     Ok(l)
   }
 
   pub fn next_token(&mut self) -> io::Result<token::Token> {
-    // Ok(token::Token::new(token::TokenType::EOF, ""))
+    while self.ch.is_ascii_whitespace() {
+      self.read_char()?;
+    }
+
     let tok = match self.ch {
       b'=' => token::Token::new(token::TokenType::ASSIGN, "="),
       b';' => token::Token::new(token::TokenType::SEMICOLON, ";"),
@@ -33,7 +36,14 @@ impl<T: std::io::Read>  Lexer<T> {
       b'+' => token::Token::new(token::TokenType::PLUS, "+"),
       b'{' => token::Token::new(token::TokenType::LBRACE, "{"),
       b'}' => token::Token::new(token::TokenType::RBRACE, "}"),
-      _ => token::Token::new(token::TokenType::EOF, ""),
+      b'\0' => token::Token::new(token::TokenType::EOF, ""),
+      ch => if ch.is_ascii_alphabetic() || ch == b'_' {
+        return self.read_ident()
+      } else if ch.is_ascii_digit() {
+        return self.read_number()
+      } else {
+        token::Token::new(token::TokenType::ILLEGAL, format!("{}", ch).as_str())
+      }
     };
     self.read_char()?;
     Ok(tok)
@@ -54,6 +64,38 @@ impl<T: std::io::Read>  Lexer<T> {
     self.ch = buf[0];
     Ok(())
   }
+
+  fn read_number(&mut self) -> io::Result<token::Token> {
+    let mut bytes: Vec<u8> = vec![];
+    loop {
+      bytes.push(self.ch);
+      self.read_char()?;
+      if !self.ch.is_ascii_digit() {
+        break
+      }
+    }
+    let s = match std::str::from_utf8(&bytes) {
+      Ok(val) => val,
+      Err(e) => return Err(io::Error::new(ErrorKind::InvalidData, format!("{}", e)))
+    };
+    Ok(token::Token::new_number(s))
+  }
+
+  fn read_ident(&mut self) -> io::Result<token::Token> {
+    let mut bytes: Vec<u8> = vec![];
+    loop {
+      bytes.push(self.ch);
+      self.read_char()?;
+      if !self.ch.is_ascii_alphabetic() && self.ch != b'_' {
+        break
+      }
+    }
+    let s = match std::str::from_utf8(&bytes) {
+      Ok(val) => val,
+      Err(e) => return Err(io::Error::new(ErrorKind::InvalidData, format!("{}", e)))
+    };
+    Ok(token::Token::new_identifier(s))
+  }
 }
 
 #[cfg(test)]
@@ -64,17 +106,57 @@ use token::{Token, TokenType};
 
 #[test]
 fn test_next_token() {
-  let src = "=+(){},;";
+  let src = r#"
+  let five = 5;
+  let ten = 10;
+  let add = fn(x, y) {
+    x + y;
+  };
+
+  let result = add(five, ten);
+  "#;
 
   let tests: Vec<Token> = vec![
+    Token::new(TokenType::LET, "let"),
+    Token::new(TokenType::IDENT, "five"),
     Token::new(TokenType::ASSIGN, "="),
-    Token::new(TokenType::PLUS, "+"),
+    Token::new(TokenType::INT, "5"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::LET, "let"),
+    Token::new(TokenType::IDENT, "ten"),
+    Token::new(TokenType::ASSIGN, "="),
+    Token::new(TokenType::INT, "10"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::LET, "let"),
+    Token::new(TokenType::IDENT, "add"),
+    Token::new(TokenType::ASSIGN, "="),
+    Token::new(TokenType::FUNCTION, "fn"),
     Token::new(TokenType::LPAREN, "("),
+    Token::new(TokenType::IDENT, "x"),
+    Token::new(TokenType::COMMA, ","),
+    Token::new(TokenType::IDENT, "y"),
     Token::new(TokenType::RPAREN, ")"),
     Token::new(TokenType::LBRACE, "{"),
-    Token::new(TokenType::RBRACE, "}"),
-    Token::new(TokenType::COMMA, ","),
+    Token::new(TokenType::IDENT, "x"),
+    Token::new(TokenType::PLUS, "+"),
+    Token::new(TokenType::IDENT, "y"),
     Token::new(TokenType::SEMICOLON, ";"),
+    Token::new(TokenType::RBRACE, "}"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::LET, "let"),
+    Token::new(TokenType::IDENT, "result"),
+    Token::new(TokenType::ASSIGN, "="),
+    Token::new(TokenType::IDENT, "add"),
+    Token::new(TokenType::LPAREN, "("),
+    Token::new(TokenType::IDENT, "five"),
+    Token::new(TokenType::COMMA, ","),
+    Token::new(TokenType::IDENT, "ten"),
+    Token::new(TokenType::RPAREN, ")"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
     Token::new(TokenType::EOF, ""),
   ];
   let mut lexer = Lexer::new(io::BufReader::new(StringReader::new(src))).expect("Lexer Build");

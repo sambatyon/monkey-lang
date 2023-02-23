@@ -104,3 +104,9 @@ impl Token {
   }
 }
 
+impl std::fmt::Display for Token {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "Token {{ typ: {} lit: {} }}", self.typ, self.lit)
+  }
+}
+

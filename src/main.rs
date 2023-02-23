@@ -1,3 +1,5 @@
 fn main() {
-  println!("Hello World!")
+  println!("Hello! This is the Monkey programming language!");
+  println!("Feel free to type commands");
+  repl::start();
 }

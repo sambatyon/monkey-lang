@@ -26,6 +26,9 @@ crates_repository(
         "once_cell": crate.spec(
             version = "1.17.1",
         ),
+        "stringreader": crate.spec(
+            version = "0.1.1",
+        ),
     },
     render_config = render_config(
         default_package_name = ""

@@ -8,6 +8,8 @@ pub struct Lexer<T: io::Read> {
   pos: i32,
   read_pos: i32,
   ch: u8,
+  peek: u8,
+  has_peek: bool
 }
 
 impl<T: std::io::Read>  Lexer<T> {
@@ -16,6 +18,8 @@ impl<T: std::io::Read>  Lexer<T> {
       input: source,
       pos: 0,
       read_pos: 0,
+      peek: b' ',
+      has_peek: false,
       ch: b' ',
     };
     l.read_char()?;
@@ -28,12 +32,32 @@ impl<T: std::io::Read>  Lexer<T> {
     }
 
     let tok = match self.ch {
-      b'=' => token::Token::new(token::TokenType::ASSIGN, "="),
+      b'=' => {
+        if self.peek_char()? == b'=' {
+          self.read_char()?;
+          token::Token::new(token::TokenType::EQ, "==")
+        } else {
+          token::Token::new(token::TokenType::ASSIGN, "=")
+        }
+      },
       b';' => token::Token::new(token::TokenType::SEMICOLON, ";"),
       b'(' => token::Token::new(token::TokenType::LPAREN, "("),
       b')' => token::Token::new(token::TokenType::RPAREN, ")"),
       b',' => token::Token::new(token::TokenType::COMMA, ","),
       b'+' => token::Token::new(token::TokenType::PLUS, "+"),
+      b'-' => token::Token::new(token::TokenType::MINUS, "-"),
+      b'!' => {
+        if self.peek_char()? == b'=' {
+          self.read_char()?;
+          token::Token::new(token::TokenType::NOT_EQ, "!=")
+        } else {
+          token::Token::new(token::TokenType::BANG, "!")
+        }
+      },
+      b'*' => token::Token::new(token::TokenType::ASTERISK, "*"),
+      b'/' => token::Token::new(token::TokenType::SLASH, "/"),
+      b'<' => token::Token::new(token::TokenType::LT, "<"),
+      b'>' => token::Token::new(token::TokenType::GT, ">"),
       b'{' => token::Token::new(token::TokenType::LBRACE, "{"),
       b'}' => token::Token::new(token::TokenType::RBRACE, "}"),
       b'\0' => token::Token::new(token::TokenType::EOF, ""),
@@ -50,19 +74,39 @@ impl<T: std::io::Read>  Lexer<T> {
   }
 
   fn read_char(&mut self) -> io::Result<()> {
+    if !self.has_peek {
+      self.ch = self.peek_char()?;
+      self.has_peek = false;
+      return Ok(());
+    }
+    self.ch = self.peek;
+    self.has_peek = false;
+    Ok(())
+  }
+
+  fn peek_char(&mut self) -> io::Result<u8> {
+    if self.has_peek {
+      return Ok(self.peek);
+    }
+    if self.peek == b'\0' {
+      return Ok(self.peek);
+    }
+
     let mut buf = [0; 1];
     match self.input.read_exact(&mut buf) {
       Ok(_) => (),
       Err(err) => match err.kind() {
         ErrorKind::UnexpectedEof => {
-          self.ch = b'\0';
-          return Ok(())
+          self.peek = b'\0';
+          self.has_peek = true;
+          return Ok(self.peek)
         }
         _ => return Err(err)
       }
     }
-    self.ch = buf[0];
-    Ok(())
+    self.peek = buf[0];
+    self.has_peek = true;
+    Ok(self.peek)
   }
 
   fn read_number(&mut self) -> io::Result<token::Token> {
@@ -114,6 +158,18 @@ fn test_next_token() {
   };
 
   let result = add(five, ten);
+
+  !-/*5;
+  5 < 10 > 5;
+
+  if (5 < 10) {
+    return true;
+  } else {
+    return false;
+  }
+
+  10 == 10;
+  10 != 9;
   "#;
 
   let tests: Vec<Token> = vec![
@@ -155,6 +211,48 @@ fn test_next_token() {
     Token::new(TokenType::COMMA, ","),
     Token::new(TokenType::IDENT, "ten"),
     Token::new(TokenType::RPAREN, ")"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::BANG, "!"),
+    Token::new(TokenType::MINUS, "-"),
+    Token::new(TokenType::SLASH, "/"),
+    Token::new(TokenType::ASTERISK, "*"),
+    Token::new(TokenType::INT, "5"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::INT, "5"),
+    Token::new(TokenType::LT, "<"),
+    Token::new(TokenType::INT, "10"),
+    Token::new(TokenType::GT, ">"),
+    Token::new(TokenType::INT, "5"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::IF, "if"),
+    Token::new(TokenType::LPAREN, "("),
+    Token::new(TokenType::INT, "5"),
+    Token::new(TokenType::LT, "<"),
+    Token::new(TokenType::INT, "10"),
+    Token::new(TokenType::RPAREN, ")"),
+    Token::new(TokenType::LBRACE, "{"),
+    Token::new(TokenType::RETURN, "return"),
+    Token::new(TokenType::TRUE, "true"),
+    Token::new(TokenType::SEMICOLON, ";"),
+    Token::new(TokenType::RBRACE, "}"),
+    Token::new(TokenType::ELSE, "else"),
+    Token::new(TokenType::LBRACE, "{"),
+    Token::new(TokenType::RETURN, "return"),
+    Token::new(TokenType::FALSE, "false"),
+    Token::new(TokenType::SEMICOLON, ";"),
+    Token::new(TokenType::RBRACE, "}"),
+
+    Token::new(TokenType::INT, "10"),
+    Token::new(TokenType::EQ, "=="),
+    Token::new(TokenType::INT, "10"),
+    Token::new(TokenType::SEMICOLON, ";"),
+
+    Token::new(TokenType::INT, "10"),
+    Token::new(TokenType::NOT_EQ, "!="),
+    Token::new(TokenType::INT, "9"),
     Token::new(TokenType::SEMICOLON, ";"),
 
     Token::new(TokenType::EOF, ""),

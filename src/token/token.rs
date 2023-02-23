@@ -64,5 +64,18 @@ impl Token {
   pub fn new(typ: TokenType, lit: &str) -> Token {
     Token { typ: typ, lit: lit.to_string() }
   }
+
+  pub fn new_identifier(s: &str) -> Token {
+    let typ = match s {
+      "let" => TokenType::LET,
+      "fn" => TokenType::FUNCTION,
+      _ => TokenType::IDENT
+    };
+    Token { typ: typ, lit: s.to_string() }
+  }
+
+  pub fn new_number(s: &str) -> Token {
+    Token { typ: TokenType::INT, lit: s.to_string() }
+  }
 }
 

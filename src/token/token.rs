@@ -102,6 +102,10 @@ impl Token {
   pub fn new_number(s: &str) -> Token {
     Token { typ: TokenType::INT, lit: s.to_string() }
   }
+
+  pub fn illegal() -> Token {
+    Token { typ: TokenType::ILLEGAL, lit: String::from("") }
+  }
 }
 
 impl std::fmt::Display for Token {

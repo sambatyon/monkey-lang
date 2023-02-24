@@ -18,6 +18,5 @@ pub fn start() -> io::Result<()> {
         break;
       }
     }
-    io::stdout().flush()?;
   }
 }

@@ -31,6 +31,8 @@ impl<T: std::io::Read>  Lexer<T> {
       self.read_char()?;
     }
 
+    // TODO: Add support for comments.
+
     let tok = match self.ch {
       b'=' => {
         if self.peek_char()? == b'=' {

@@ -109,3 +109,20 @@ impl Statement for LetStmt {
     self.token.lit.as_str()
   }
 }
+
+pub struct ReturnStmt {
+  token: token::Token,
+  // value: Box<dyn Expression>,
+}
+
+impl ReturnStmt {
+  pub fn new(tok: token::Token/*, val: Box<dyn Expression>*/) -> ReturnStmt {
+    ReturnStmt { token: tok/* , value: val*/ }
+  }
+}
+
+impl Statement for ReturnStmt {
+  fn literal(&self) -> &str {
+    self.token.lit.as_str()
+  }
+}

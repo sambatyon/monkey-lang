@@ -27,47 +27,85 @@ impl<T: std::io::Read> Parser<T> {
 
   pub fn program(&mut self) -> Result<Box<ast::Program>, String> {
     let mut stmts = Vec::new();
+    let mut error = false;
     while self.cur.typ != token::TokenType::EOF {
-      let stmt = self.stmt()?;
+      let stmt = self.stmt();
+      if stmt.is_invalid() {
+        error = true
+      }
       stmts.push(stmt);
-      self.next_token()?;
+      match self.next_token() {
+        Ok(_) => (),
+        Err(msg) => {
+          self.errors.push(msg);
+          error = true;
+          break;
+        }
+      }
+    }
+    if error {
+      return Err(self.errors.join("\n"));
     }
     Ok(Box::new(ast::Program::new(stmts)))
   }
 
-  fn stmt(&mut self) -> Result<Box<dyn ast::Statement>, String> {
+  fn stmt(&mut self) -> Box<dyn ast::Statement> {
     match self.cur.typ {
       token::TokenType::LET => {
         match self.let_stmt() {
-          Ok(l) => return Ok(Box::new(l)),
-          _ => Ok(Box::new(ast::InvalidStmt::new()))
+          Some(l) => return Box::new(l),
+          _ => Box::new(ast::InvalidStmt::new())
         }
       },
-      _ => Ok(Box::new(ast::InvalidStmt::new()))
+      token::TokenType::RETURN => {
+        match self.return_stmt() {
+          Some(r) => return Box::new(r),
+          _ => Box::new(ast::InvalidStmt::new())
+        }
+      },
+      _ => Box::new(ast::InvalidStmt::new())
     }
   }
 
-  fn let_stmt(&mut self) -> Result<ast::LetStmt, ()> {
+  fn let_stmt(&mut self) -> Option<ast::LetStmt> {
     let tok = self.cur.clone();
     if !self.expect_peek(token::TokenType::IDENT) {
-      return Err(())
+      return None;
     }
     let id = ast::IdentExpr::new(self.cur.clone());
 
     if !self.expect_peek(token::TokenType::ASSIGN) {
-      return Err(())
+      return None;
     }
 
     while !self.match_cur(token::TokenType::SEMICOLON) {
-      match self.next_token() {
-        Ok(_) => (),
-        Err(s) => {
-          self.errors.push(s);
-          return Err(())
-        }
-      };
+      let r = self.next_token();
+      if r.is_err() {
+        self.errors.push(r.unwrap_err());
+        return None;
+      }
     }
-    Ok(ast::LetStmt::new(tok, id))
+    Some(ast::LetStmt::new(tok, id))
+  }
+
+  fn return_stmt(&mut self) -> Option<ast::ReturnStmt> {
+    let tok = self.cur.clone();
+
+    let r = self.next_token();
+    if r.is_err() {
+      self.errors.push(r.unwrap_err());
+      return None;
+    }
+
+    while !self.match_cur(token::TokenType::SEMICOLON) {
+      let r = self.next_token();
+      if r.is_err() {
+        self.errors.push(r.unwrap_err());
+        return None;
+      }
+    }
+
+    Some(ast::ReturnStmt::new(tok))
   }
 
   fn next_token(&mut self) -> Result<(), String> {
@@ -129,7 +167,6 @@ fn test_let_stmts() {
   let mut parser = Parser::new(lexer).expect("creating parser");
 
   let program = parser.program().expect("Parsing program");
-  check_parser_errors(&parser);
 
   assert_eq!(program.stmts.len(), 3);
   let mut idx = 0;
@@ -149,14 +186,23 @@ fn test_let_stmt(stmt: &Box<dyn Statement>, id: &str) {
   assert_eq!(l.name.literal(), id);
 }
 
-fn check_parser_errors<T: std::io::Read>(parser: &Parser<T>) {
-  if parser.errors().is_empty() {
-    return
+#[test]
+fn test_return_stmts() {
+  let src = r#"
+  return 5;
+  return 10;
+  return 993322;
+  "#;
+
+  let lexer = lexer::Lexer::new(io::BufReader::new(StringReader::new(src))).expect("Lexer Build");
+  let mut parser = Parser::new(lexer).expect("creating parser");
+
+  let program = parser.program().expect("Parsing program");
+
+  assert_eq!(program.stmts.len(), 3);
+  for stmt in program.stmts {
+    let r = stmt.as_ref().as_any().downcast_ref::<ast::ReturnStmt>().expect("Wrong Type for Return statement");
+    assert_eq!(r.literal(), "return", "returnStmt.literal() not 'return': {}", r.literal());
   }
-  println!("parser encountered {} errors", parser.errors.len());
-  for err in parser.errors() {
-    println!("{}", err);
-  }
-  assert!(false)
 }
 }

@@ -1,7 +1,7 @@
 use std::io;
 use std::mem::swap;
 
-use ast;
+use ast::{self, InvalidExpr};
 use lexer;
 use token::TokenType;
 
@@ -85,7 +85,7 @@ impl<T: std::io::Read> Parser<T> {
         return None;
       }
     }
-    Some(ast::LetStmt::new(tok, id))
+    Some(ast::LetStmt::new(tok, id, Box::new(InvalidExpr::new())))
   }
 
   fn return_stmt(&mut self) -> Option<ast::ReturnStmt> {
@@ -105,7 +105,7 @@ impl<T: std::io::Read> Parser<T> {
       }
     }
 
-    Some(ast::ReturnStmt::new(tok))
+    Some(ast::ReturnStmt::new(tok, Box::new(InvalidExpr::new())))
   }
 
   fn next_token(&mut self) -> Result<(), String> {
@@ -152,7 +152,7 @@ impl<T: std::io::Read> Parser<T> {
 mod test {
 use super::*;
 use std::io;
-use ast::{Statement, Expression};
+use ast::{Statement, Node};
 use stringreader::StringReader;
 
 #[test]

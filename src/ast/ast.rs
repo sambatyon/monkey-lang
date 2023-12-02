@@ -1,5 +1,6 @@
 
 use token;
+use std::fmt;
 
 
 pub trait AToAny: 'static {
@@ -12,15 +13,17 @@ impl<T: 'static> AToAny for T {
   }
 }
 
-pub trait Statement: AToAny {
+pub trait Node: AToAny + fmt::Display {
   fn literal(&self) -> &str { "" }
+}
+
+pub trait Statement: Node {
   fn is_invalid(&self) -> bool {
     false
   }
 }
 
-pub trait Expression: AToAny {
-  fn literal(&self) -> &str { "" }
+pub trait Expression: Node {
   fn is_invalid(&self) -> bool {
     false
   }
@@ -41,12 +44,28 @@ impl Statement for InvalidStmt {
   }
 }
 
+impl Node for InvalidStmt {}
+
+impl fmt::Display for InvalidStmt {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "«INVALID_STMT»")
+  }
+}
+
 #[derive(Debug)]
 pub struct InvalidExpr {}
 
 impl InvalidExpr {
   pub fn new() -> InvalidExpr {
     InvalidExpr {  }
+  }
+}
+
+impl Node for InvalidExpr {}
+
+impl fmt::Display for InvalidExpr {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "«INVALID_EXPR»")
   }
 }
 
@@ -64,12 +83,24 @@ impl Program {
   pub fn new(stmts: Vec<Box<dyn Statement>>) -> Program {
     Program { stmts: stmts }
   }
+}
 
+impl Node for Program {
   fn literal(&self) -> &str {
     if !self.stmts.is_empty() {
       return self.stmts[0].literal();
     }
     ""
+  }
+}
+
+impl fmt::Display for Program {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let mut prog = String::new();
+    for stmt in &self.stmts {
+      prog.push_str(format!("{}\n", stmt).as_str());
+    }
+    write!(f, "{}", prog)
   }
 }
 
@@ -86,9 +117,17 @@ impl IdentExpr {
   }
 }
 
-impl Expression for IdentExpr {
+impl Expression for IdentExpr {}
+
+impl Node for IdentExpr {
   fn literal(&self) -> &str {
     self.token.lit.as_str()
+  }
+}
+
+impl fmt::Display for IdentExpr {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.value)
   }
 }
 
@@ -99,30 +138,71 @@ pub struct LetStmt {
 }
 
 impl LetStmt {
-  pub fn new(tok: token::Token, id: IdentExpr) -> LetStmt {
-    LetStmt { token: tok, name: id, value: Box::new(InvalidExpr::new()) }
+  pub fn new(tok: token::Token, id: IdentExpr, val: Box<dyn Expression>) -> LetStmt {
+    LetStmt { token: tok, name: id, value: val }
   }
 }
 
-impl Statement for LetStmt {
+impl Statement for LetStmt {}
+
+impl Node for LetStmt {
   fn literal(&self) -> &str {
     self.token.lit.as_str()
+  }
+}
+
+impl fmt::Display for LetStmt {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "let {} = {};", self.name, self.value)
   }
 }
 
 pub struct ReturnStmt {
   token: token::Token,
-  // value: Box<dyn Expression>,
+  expr: Box<dyn Expression>,
 }
 
 impl ReturnStmt {
-  pub fn new(tok: token::Token/*, val: Box<dyn Expression>*/) -> ReturnStmt {
-    ReturnStmt { token: tok/* , value: val*/ }
+  pub fn new(tok: token::Token, val: Box<dyn Expression>) -> ReturnStmt {
+    ReturnStmt { token: tok, expr: val }
   }
 }
 
-impl Statement for ReturnStmt {
+impl Statement for ReturnStmt {}
+
+impl Node for ReturnStmt {
   fn literal(&self) -> &str {
     self.token.lit.as_str()
+  }
+}
+
+impl fmt::Display for ReturnStmt {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "return {}", self.expr)
+  }
+}
+
+pub struct ExprStmt {
+  token: token::Token,
+  expr: Box<dyn Expression>,
+}
+
+impl ExprStmt {
+  pub fn new(tok: token::Token, expr: Box<dyn Expression>) -> ExprStmt {
+    ExprStmt { token: tok , expr: expr }
+  }
+}
+
+impl Statement for ExprStmt {}
+
+impl Node for ExprStmt {
+  fn literal(&self) -> &str {
+    self.token.lit.as_str()
+  }
+}
+
+impl fmt::Display for ExprStmt {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.expr)
   }
 }

@@ -1,23 +1,24 @@
-%token LET
-%token IDENT
 %token EOF
+%token IDENT
+%token LET
+%token RETURN
 
 %%
 
-program: stmts EOF
+program : stmts EOF;
 
-stmts: /* nothing */
+stmts : /* nothing */
   | stmt ';' stmts
   ;
 
-stmt:
+stmt :
     letstmt
   | returnstmt;
 
-letstmt: LET IDENT '=' expr;
+letstmt : LET IDENT '=' expr;
 
-returnstmt: RETURN expr;
+returnstmt : RETURN expr;
 
-expr: ;
+expr : ;
 
 %%
